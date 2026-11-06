@@ -315,21 +315,55 @@ class RegisteredUserController extends Controller
             $user->assignRole('Organization Admin');
 
             if ($isTrialSelected) {
-                // Assign Free / Trial plan
-                $trialPlan = \App\Models\Plan::where('name', 'Free')->first();
+                // Assign Free / Trial plan tailored to the selected business category
+                $isRestaurant = ($request->business_type === 'restaurant');
+                $planName = $isRestaurant ? 'Free Restaurant Trial' : 'Free';
+                $planCategory = $isRestaurant ? 'restaurant' : 'business';
+
+                $trialPlan = \App\Models\Plan::where('name', $planName)->first();
                 if (!$trialPlan) {
                     $trialPlan = \App\Models\Plan::create([
-                        'name' => 'Free',
-                        'category' => 'all',
+                        'name' => $planName,
+                        'category' => $planCategory,
+                        'type' => 'base',
+                        'duration_unit' => 'days',
+                        'duration_value' => 30,
+                        'price' => 0,
                         'price_monthly' => 0,
                         'price_yearly' => 0,
-                        'is_active' => true,
-                        'description' => 'Default free trial plan'
+                        'is_active' => false,
+                        'description' => 'Default free trial plan for ' . ($isRestaurant ? 'Restaurant / Food POS' : 'Retail & Wholesale ERP')
                     ]);
                 }
 
-                \App\Models\PlanFeature::firstOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'module_retail'], ['feature_value' => 'true']);
-                \App\Models\PlanFeature::firstOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'module_payroll'], ['feature_value' => 'true']);
+                if ($isRestaurant) {
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'module_restaurant'], ['feature_value' => 'true']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'digital_qr_menu'], ['feature_value' => 'true']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'kitchen_display'], ['feature_value' => 'true']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'table_management'], ['feature_value' => 'true']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'module_payroll'], ['feature_value' => 'true']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'module_retail'], ['feature_value' => 'false']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'barcode_scanning'], ['feature_value' => 'false']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'payment_gateway'], ['feature_value' => 'true']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'max_tables'], ['feature_value' => 'Unlimited']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'max_employees'], ['feature_value' => 'Unlimited']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'max_invoices_per_month'], ['feature_value' => 'Unlimited']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'max_locations'], ['feature_value' => '1']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'max_products'], ['feature_value' => 'Unlimited']);
+                } else {
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'module_retail'], ['feature_value' => 'true']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'module_payroll'], ['feature_value' => 'true']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'module_restaurant'], ['feature_value' => 'false']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'digital_qr_menu'], ['feature_value' => 'false']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'kitchen_display'], ['feature_value' => 'false']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'table_management'], ['feature_value' => 'false']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'payment_gateway'], ['feature_value' => 'true']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'barcode_scanning'], ['feature_value' => 'true']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'max_employees'], ['feature_value' => '5']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'max_invoices_per_month'], ['feature_value' => '50']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'max_locations'], ['feature_value' => '1']);
+                    \App\Models\PlanFeature::updateOrCreate(['plan_id' => $trialPlan->id, 'feature_code' => 'max_products'], ['feature_value' => 'Unlimited']);
+                }
 
                 $status = ($enableTrial && $trialDays > 0) ? 'Trial' : 'Expired';
                 $endsAt = ($enableTrial && $trialDays > 0) ? now()->addDays($trialDays) : now()->subDay();

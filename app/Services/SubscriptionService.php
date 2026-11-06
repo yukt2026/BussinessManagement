@@ -79,8 +79,29 @@ class SubscriptionService
     public static function hasFeature($orgId, $featureCode)
     {
         $val = self::getFeatureValue($orgId, $featureCode);
-        if ($val === null) return false;
-        return in_array(strtolower(trim((string)$val)), ['true', 'yes', 'on']);
+        if ($val !== null && in_array(strtolower(trim((string)$val)), ['true', 'yes', 'on'])) {
+            return true;
+        }
+
+        // Safety fallback: If organization is currently in active Trial, ensure category-appropriate modules are enabled
+        if (self::isTrial($orgId)) {
+            $org = Organization::find($orgId);
+            if ($org) {
+                if ($org->business_type === 'restaurant') {
+                    $restaurantFeatures = ['module_restaurant', 'digital_qr_menu', 'kitchen_display', 'table_management', 'module_payroll', 'payment_gateway'];
+                    if (in_array($featureCode, $restaurantFeatures)) {
+                        return true;
+                    }
+                } else {
+                    $retailFeatures = ['module_retail', 'module_payroll', 'payment_gateway', 'barcode_scanning'];
+                    if (in_array($featureCode, $retailFeatures)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
 

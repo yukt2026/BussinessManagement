@@ -36,4 +36,39 @@ class RegistrationTest extends TestCase
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
     }
+
+    public function test_restaurant_free_trial_registration_grants_restaurant_module(): void
+    {
+        $response = $this->post('/register', [
+            'organization_name' => 'Royal Spice Cafe',
+            'business_type' => 'restaurant',
+            'business_phone' => '9876543210',
+            'country' => 'India',
+            'state' => 'Delhi',
+            'pincode' => '110001',
+            'address' => '456 Food Street',
+            'name' => 'Restro Owner',
+            'admin_phone' => '9876543210',
+            'email' => 'restro@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'plan' => 'trial',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('dashboard', absolute: false));
+
+        $user = \App\Models\User::where('email', 'restro@example.com')->first();
+        $this->assertNotNull($user);
+        $this->assertEquals('restaurant', $user->organization->business_type);
+
+        $hasRestaurant = \App\Services\SubscriptionService::hasFeature($user->organization_id, 'module_restaurant');
+        $this->assertTrue($hasRestaurant);
+
+        $hasRetail = \App\Services\SubscriptionService::hasFeature($user->organization_id, 'module_retail');
+        $this->assertFalse($hasRetail);
+
+        $menuResponse = $this->actingAs($user)->get('/organization/menu');
+        $menuResponse->assertStatus(200);
+    }
 }
