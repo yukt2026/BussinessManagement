@@ -11,10 +11,17 @@
     modalCategory: '',
     selectedVariantId: null,
     selectedVariantPrice: null,
+    variantQuantities: {},
+    singleQty: 1,
     openDishModal(dish, categoryName) {
         this.modalDish = dish;
         this.modalCategory = categoryName;
+        this.variantQuantities = {};
+        this.singleQty = 1;
         if (dish.has_variants && dish.variants && dish.variants.length > 0) {
+            dish.variants.forEach((v, index) => {
+                this.variantQuantities[v.id] = (index === 0 ? 1 : 0);
+            });
             this.selectedVariantId = dish.variants[0].id;
             this.selectedVariantPrice = parseFloat(dish.variants[0].price);
         } else {
@@ -22,6 +29,29 @@
             this.selectedVariantPrice = parseFloat(dish.price || 0);
         }
         this.dishModalOpen = true;
+    },
+    changeVariantQty(variantId, delta) {
+        let current = this.variantQuantities[variantId] || 0;
+        this.variantQuantities[variantId] = Math.max(0, current + delta);
+    },
+    get modalTotalCount() {
+        if (!this.modalDish.has_variants) return this.singleQty;
+        let count = 0;
+        for (let id in this.variantQuantities) {
+            count += (this.variantQuantities[id] || 0);
+        }
+        return count;
+    },
+    get modalTotalPrice() {
+        if (!this.modalDish.has_variants) {
+            return (parseFloat(this.modalDish.price || 0)) * this.singleQty;
+        }
+        let total = 0;
+        (this.modalDish.variants || []).forEach(v => {
+            let q = this.variantQuantities[v.id] || 0;
+            total += q * (parseFloat(v.price) || 0);
+        });
+        return total;
     }
 }" class="min-h-screen bg-white pb-10">
 
@@ -583,39 +613,83 @@
                     <p class="text-xs text-slate-600 font-medium leading-relaxed" x-text="modalDish.description || 'Authentic gourmet recipe freshly prepared to order with handpicked ingredients.'"></p>
                 </div>
 
-                <!-- Variations Selection Section -->
+                <!-- Variations Selection Section (Multiple Selection Enabled) -->
                 <template x-if="modalDish.has_variants && modalDish.variants && modalDish.variants.length > 0">
                     <div class="space-y-2 pt-2 border-t border-slate-100">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-black uppercase tracking-wider text-slate-700">Choose Size / Portion</span>
-                            <span class="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">Required</span>
+                            <span class="text-xs font-black uppercase tracking-wider text-slate-700">Choose Sizes & Portions</span>
+                            <span class="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">Multiple selection enabled</span>
                         </div>
-                        <div class="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1">
+                        <div class="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto pr-1">
                             <template x-for="v in modalDish.variants" :key="v.id">
-                                <label :class="selectedVariantId == v.id ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-500/20' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'"
-                                       class="flex items-center justify-between p-3 rounded-2xl border cursor-pointer transition select-none">
-                                    <div class="flex items-center gap-2.5">
-                                        <input type="radio" name="modal_variant_choice" :value="v.id" x-model="selectedVariantId" @change="selectedVariantPrice = parseFloat(v.price)" class="accent-amber-500 w-4 h-4">
-                                        <span class="text-xs font-extrabold text-slate-900" x-text="v.name"></span>
+                                <div :class="(variantQuantities[v.id] || 0) > 0 ? 'border-amber-500 bg-amber-50/60 ring-1 ring-amber-500/20' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'"
+                                     class="flex items-center justify-between p-3 rounded-2xl border transition select-none">
+                                    <div class="flex-1 min-w-0 pr-2">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="text-xs font-extrabold text-slate-900 truncate" x-text="v.name"></span>
+                                            <span x-show="(variantQuantities[v.id] || 0) > 0" 
+                                                  class="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black">
+                                                <span x-text="variantQuantities[v.id]"></span>x
+                                            </span>
+                                        </div>
+                                        <span class="text-sm font-mono font-black text-slate-950 mt-0.5 block" x-text="'₹' + parseFloat(v.price).toFixed(2)"></span>
                                     </div>
-                                    <span class="text-sm font-mono font-black text-slate-950" x-text="'₹' + parseFloat(v.price).toFixed(2)"></span>
-                                </label>
+
+                                    <!-- Stepper buttons -->
+                                    <div class="flex items-center gap-1 shrink-0">
+                                        <template x-if="(variantQuantities[v.id] || 0) === 0">
+                                            <button type="button" @click="changeVariantQty(v.id, 1)" 
+                                                    class="px-3 py-1.5 bg-white hover:bg-amber-500 hover:text-slate-950 border border-slate-300 hover:border-amber-500 text-slate-800 text-xs font-black rounded-xl transition shadow-2xs cursor-pointer">
+                                                + Add
+                                            </button>
+                                        </template>
+                                        <template x-if="(variantQuantities[v.id] || 0) > 0">
+                                            <div class="flex items-center gap-1 bg-white p-1 rounded-xl border border-amber-400 shadow-2xs">
+                                                <button type="button" @click="changeVariantQty(v.id, -1)" 
+                                                        class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 font-black flex items-center justify-center text-sm transition cursor-pointer">
+                                                    −
+                                                </button>
+                                                <span class="w-7 text-center font-mono font-black text-xs text-slate-950" x-text="variantQuantities[v.id]"></span>
+                                                <button type="button" @click="changeVariantQty(v.id, 1)" 
+                                                        class="w-7 h-7 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-black flex items-center justify-center text-sm transition cursor-pointer">
+                                                    +
+                                                </button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
                             </template>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Single Item Quantity Stepper when no variants -->
+                <template x-if="!modalDish.has_variants || !modalDish.variants || modalDish.variants.length === 0">
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                        <span class="text-xs font-black uppercase tracking-wider text-slate-700">Quantity</span>
+                        <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                            <button type="button" @click="singleQty = Math.max(1, singleQty - 1)" class="w-7 h-7 rounded-lg bg-white text-slate-700 font-black text-sm flex items-center justify-center shadow-2xs cursor-pointer">−</button>
+                            <span class="w-8 text-center font-mono font-black text-xs text-slate-950" x-text="singleQty"></span>
+                            <button type="button" @click="singleQty++" class="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-2xs cursor-pointer">+</button>
                         </div>
                     </div>
                 </template>
 
                 <div class="flex items-center justify-between pt-4 border-t border-slate-100">
                     <div>
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Price</span>
-                        <span class="text-2xl font-black text-slate-950 font-mono">₹<span x-text="(selectedVariantPrice || parseFloat(modalDish.price || 0)).toFixed(2)"></span></span>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total (<span x-text="modalTotalCount"></span> items)</span>
+                        <span class="text-2xl font-black text-slate-950 font-mono">₹<span x-text="modalTotalPrice.toFixed(2)"></span></span>
                     </div>
                     
                     <form action="{{ route('public.order.add', [$organization->id, $location->id]) }}" method="POST" class="m-0">
                         @csrf
                         <input type="hidden" name="menu_item_id" :value="modalDish.id">
-                        <input type="hidden" name="menu_item_variant_id" :value="selectedVariantId">
-                        <button type="submit" class="bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black px-6 py-3 rounded-xl text-xs uppercase tracking-wider shadow-md hover:shadow-lg transition active:scale-95 flex items-center gap-1.5 cursor-pointer">
+                        <input type="hidden" name="quantity" :value="singleQty">
+                        <template x-for="v in (modalDish.variants || [])" :key="v.id">
+                            <input type="hidden" :name="'variants[' + v.id + ']'" :value="variantQuantities[v.id] || 0">
+                        </template>
+                        <button type="submit" :disabled="modalTotalCount === 0"
+                                class="bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-slate-950 font-black px-6 py-3 rounded-xl text-xs uppercase tracking-wider shadow-md hover:shadow-lg transition active:scale-95 flex items-center gap-1.5 cursor-pointer">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                             <span>Add to Order</span>
                         </button>

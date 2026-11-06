@@ -950,40 +950,78 @@
     <!-- DISH VARIANT / PORTION SELECTION MODAL    -->
     <!-- ========================================== -->
     <div x-show="variantModalOpen" x-cloak class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-        <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 border border-slate-200 my-auto overflow-hidden animate-in fade-in zoom-in duration-150" @click.away="variantModalOpen = false">
-            <div class="flex items-center justify-between border-b border-slate-200 pb-3">
-                <div class="flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+        <div class="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 border border-slate-200 my-auto overflow-hidden animate-in fade-in zoom-in duration-150" @click.away="variantModalOpen = false">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-3 h-3 rounded-full bg-amber-500 shrink-0"></span>
                     <div>
-                        <h3 class="font-extrabold text-sm text-slate-950" x-text="selectedItemForVariants?.name"></h3>
-                        <p class="text-[11px] text-slate-500 font-medium">Select Size / Portion Option</p>
+                        <h3 class="font-black text-base text-slate-950 tracking-tight" x-text="selectedItemForVariants?.name"></h3>
+                        <p class="text-[11px] text-slate-500 font-bold">Select Multiple Sizes & Quantities</p>
                     </div>
                 </div>
-                <button type="button" @click="variantModalOpen = false" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-black flex items-center justify-center text-xs cursor-pointer transition">✕</button>
+                <button type="button" @click="variantModalOpen = false" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-black flex items-center justify-center text-sm cursor-pointer transition">✕</button>
             </div>
 
-            <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+            <div class="space-y-2.5 max-h-80 overflow-y-auto pr-1">
                 <template x-for="v in (selectedItemForVariants?.variants || [])" :key="v.id">
-                    <button type="button" @click="selectVariantAndAdd(v)" 
-                            class="w-full flex items-center justify-between p-3 rounded-xl border-2 border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 transition cursor-pointer group text-left shadow-2xs">
-                        <div>
-                            <span class="text-xs font-black text-slate-900 group-hover:text-amber-700 block" x-text="v.name"></span>
-                            <span class="text-[10px] text-slate-400 font-semibold" x-text="v.is_available ? 'Available' : 'Sold out'"></span>
+                    <div class="w-full flex items-center justify-between p-3 rounded-2xl border-2 transition shadow-2xs"
+                         :class="(variantSelections[v.id] || 0) > 0 ? 'border-amber-500 bg-amber-50/40 ring-1 ring-amber-500/20' : 'border-slate-200 bg-white hover:border-slate-300'">
+                        <div class="flex-1 min-w-0 pr-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-black text-slate-900 block truncate" x-text="v.name"></span>
+                                <span x-show="(variantSelections[v.id] || 0) > 0" 
+                                      class="px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black">
+                                    <span x-text="variantSelections[v.id]"></span>x
+                                </span>
+                            </div>
+                            <span class="text-xs font-mono font-black text-amber-900 mt-0.5 block" x-text="'₹' + parseFloat(v.price).toFixed(2)"></span>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-sm font-mono font-black text-slate-950 group-hover:text-amber-900" x-text="'₹' + parseFloat(v.price).toFixed(2)"></span>
-                            <span class="w-6 h-6 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-black text-xs transition">
-                                +
-                            </span>
+
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <template x-if="(variantSelections[v.id] || 0) === 0">
+                                <button type="button" @click="changeVariantQty(v.id, 1)"
+                                        class="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-amber-500 hover:text-slate-950 text-slate-800 text-xs font-black transition flex items-center gap-1 cursor-pointer">
+                                    <span>+</span> Add
+                                </button>
+                            </template>
+                            <template x-if="(variantSelections[v.id] || 0) > 0">
+                                <div class="flex items-center gap-1 bg-white p-1 rounded-xl border border-amber-300 shadow-2xs">
+                                    <button type="button" @click="changeVariantQty(v.id, -1)" 
+                                            class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 font-black flex items-center justify-center text-sm transition cursor-pointer">
+                                        −
+                                    </button>
+                                    <span class="w-8 text-center font-mono font-black text-xs text-slate-950" x-text="variantSelections[v.id]"></span>
+                                    <button type="button" @click="changeVariantQty(v.id, 1)" 
+                                            class="w-7 h-7 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-black flex items-center justify-center text-sm transition cursor-pointer">
+                                        +
+                                    </button>
+                                </div>
+                            </template>
                         </div>
-                    </button>
+                    </div>
                 </template>
             </div>
 
-            <div class="pt-2 border-t border-slate-100 flex justify-end">
-                <button type="button" @click="variantModalOpen = false" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs cursor-pointer">
-                    Cancel
-                </button>
+            <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                <div>
+                    <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Total Selected</span>
+                    <span class="text-sm font-black font-mono text-slate-950">
+                        <span x-text="variantModalTotalCount"></span> items • ₹<span x-text="variantModalTotalPrice.toFixed(2)"></span>
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button type="button" @click="variantModalOpen = false" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition">
+                        Cancel
+                    </button>
+                    <button type="button" @click="addSelectedVariantsToCart()" 
+                            :disabled="variantModalTotalCount === 0"
+                            :class="variantModalTotalCount > 0 ? 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-950 shadow-md cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed'"
+                            class="px-4 py-2 font-black rounded-xl text-xs transition flex items-center gap-1.5">
+                        <span>Add to Order</span>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -1024,6 +1062,7 @@ function counterBilling() {
         cart: [],
         variantModalOpen: false,
         selectedItemForVariants: null,
+        variantSelections: {},
         
         // Modal State
         settleModalOpen: false,
@@ -1196,20 +1235,54 @@ function counterBilling() {
         addToCart(item) {
             if (item.has_variants && item.variants && item.variants.length > 0) {
                 this.selectedItemForVariants = item;
+                this.variantSelections = {};
+                item.variants.forEach((v, idx) => {
+                    this.variantSelections[v.id] = (idx === 0 ? 1 : 0);
+                });
                 this.variantModalOpen = true;
                 return;
             }
-            this.pushToCart(item, null);
+            this.pushToCart(item, null, 1);
         },
 
-        selectVariantAndAdd(variant) {
+        changeVariantQty(variantId, change) {
+            let current = this.variantSelections[variantId] || 0;
+            this.variantSelections[variantId] = Math.max(0, current + change);
+        },
+
+        get variantModalTotalCount() {
+            let total = 0;
+            for (let id in this.variantSelections) {
+                total += (this.variantSelections[id] || 0);
+            }
+            return total;
+        },
+
+        get variantModalTotalPrice() {
+            if (!this.selectedItemForVariants) return 0;
+            let sum = 0;
+            (this.selectedItemForVariants.variants || []).forEach(v => {
+                let q = this.variantSelections[v.id] || 0;
+                sum += q * (parseFloat(v.price) || 0);
+            });
+            return sum;
+        },
+
+        addSelectedVariantsToCart() {
             if (!this.selectedItemForVariants) return;
-            this.pushToCart(this.selectedItemForVariants, variant);
+            const item = this.selectedItemForVariants;
+            (item.variants || []).forEach(v => {
+                let qty = this.variantSelections[v.id] || 0;
+                if (qty > 0) {
+                    this.pushToCart(item, v, qty);
+                }
+            });
             this.variantModalOpen = false;
             this.selectedItemForVariants = null;
+            this.variantSelections = {};
         },
 
-        pushToCart(item, variant = null) {
+        pushToCart(item, variant = null, qty = 1) {
             const variantId = variant ? variant.id : null;
             const variantName = variant ? variant.name : null;
             const itemPrice = variant ? parseFloat(variant.price) : parseFloat(item.price);
@@ -1217,7 +1290,7 @@ function counterBilling() {
 
             let existing = this.cart.find(i => i.cartKey === cartKey);
             if (existing) {
-                existing.qty++;
+                existing.qty += qty;
             } else {
                 this.cart.push({
                     cartKey: cartKey,
@@ -1226,7 +1299,7 @@ function counterBilling() {
                     variant_name: variantName,
                     name: item.name,
                     price: itemPrice,
-                    qty: 1
+                    qty: qty
                 });
             }
         },

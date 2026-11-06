@@ -22,11 +22,49 @@ class PublicOrderController extends Controller
         $cartKey = 'cart_' . $location->id;
         $cart = session()->get($cartKey, []);
 
+        // 1. Support multiple variant selections submitted at once
+        if ($request->has('variants') && is_array($request->variants)) {
+            $addedAny = false;
+            foreach ($request->variants as $variantId => $qty) {
+                $qty = (int)$qty;
+                if ($qty <= 0) continue;
+
+                $variant = \App\Models\MenuItemVariant::where('menu_item_id', $item->id)->find($variantId);
+                if (!$variant) continue;
+
+                $price = (float)$variant->price;
+                $variantName = $variant->name;
+                $name = $item->name . ' (' . $variant->name . ')';
+                $cartKeyItem = $item->id . '_' . $variant->id;
+
+                if (isset($cart[$cartKeyItem])) {
+                    $cart[$cartKeyItem]['quantity'] += $qty;
+                } else {
+                    $cart[$cartKeyItem] = [
+                        'id' => $item->id,
+                        'variant_id' => $variant->id,
+                        'variant_name' => $variantName,
+                        'name' => $name,
+                        'price' => $price,
+                        'quantity' => $qty
+                    ];
+                }
+                $addedAny = true;
+            }
+
+            if ($addedAny) {
+                session()->put($cartKey, $cart);
+                return back()->with('success', 'Items added to order.');
+            }
+        }
+
+        // 2. Fallback for single variant or standard item without variants
         $variantId = $request->input('menu_item_variant_id');
         $variant = null;
         $price = (float)$item->price;
         $name = $item->name;
         $variantName = null;
+        $singleQty = max(1, (int)$request->input('quantity', 1));
 
         if ($variantId) {
             $variant = \App\Models\MenuItemVariant::where('menu_item_id', $item->id)->find($variantId);
@@ -40,7 +78,7 @@ class PublicOrderController extends Controller
         $cartKeyItem = $variantId ? ($item->id . '_' . $variantId) : (string)$item->id;
 
         if (isset($cart[$cartKeyItem])) {
-            $cart[$cartKeyItem]['quantity']++;
+            $cart[$cartKeyItem]['quantity'] += $singleQty;
         } else {
             $cart[$cartKeyItem] = [
                 'id' => $item->id,
@@ -48,13 +86,13 @@ class PublicOrderController extends Controller
                 'variant_name' => $variantName,
                 'name' => $name,
                 'price' => $price,
-                'quantity' => 1
+                'quantity' => $singleQty
             ];
         }
 
         session()->put($cartKey, $cart);
 
-        return back()->with('success', 'Item added to cart.');
+        return back()->with('success', 'Item added to order.');
     }
 
     public function cart(Organization $organization, Location $location)
@@ -118,10 +156,17 @@ class PublicOrderController extends Controller
         try {
             $subtotal = 0;
             
-            // Re-calculate pricing server side to avoid cart tampering
+            // Re-calculate pricing server side to avoid cart tampering, respecting variant prices
             foreach ($cart as $cartItem) {
                 $item = MenuItem::findOrFail($cartItem['id']);
-                $subtotal += $item->price * $cartItem['quantity'];
+                $unitPrice = (float)$item->price;
+                if (!empty($cartItem['variant_id'])) {
+                    $variant = \App\Models\MenuItemVariant::where('menu_item_id', $item->id)->find($cartItem['variant_id']);
+                    if ($variant) {
+                        $unitPrice = (float)$variant->price;
+                    }
+                }
+                $subtotal += $unitPrice * $cartItem['quantity'];
             }
 
             $cgstPercent = (float)($organization->cgst_percent ?? 0);

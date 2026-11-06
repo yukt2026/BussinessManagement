@@ -126,4 +126,56 @@ class PublicOrderTest extends TestCase
             'total' => 222.00,
         ]);
     }
+
+    public function test_customer_can_order_multiple_variants_at_once()
+    {
+        $org = Organization::create([
+            'name' => 'Pizza Palace',
+            'cgst_percent' => 0.00,
+            'sgst_percent' => 0.00,
+        ]);
+        $loc = Location::create(['organization_id' => $org->id, 'name' => 'Main', 'is_active' => true]);
+        $cat = MenuCategory::create(['organization_id' => $org->id, 'location_id' => $loc->id, 'name' => 'Pizza']);
+        $item = MenuItem::create([
+            'menu_category_id' => $cat->id,
+            'name' => 'Margherita Pizza',
+            'price' => 199.00,
+            'has_variants' => true,
+            'is_available' => true
+        ]);
+        $vSmall = $item->variants()->create(['name' => 'Small', 'price' => 150.00, 'sort_order' => 1]);
+        $vMedium = $item->variants()->create(['name' => 'Medium', 'price' => 250.00, 'sort_order' => 2]);
+        $vLarge = $item->variants()->create(['name' => 'Large', 'price' => 350.00, 'sort_order' => 3]);
+
+        // Submit multiple variations at once (2 Small and 1 Large)
+        $this->post(route('public.order.add', [$org->id, $loc->id]), [
+            'menu_item_id' => $item->id,
+            'variants' => [
+                $vSmall->id => 2,
+                $vMedium->id => 0,
+                $vLarge->id => 1,
+            ]
+        ]);
+
+        $cartResponse = $this->get(route('public.order.cart', [$org->id, $loc->id]));
+        $cartResponse->assertStatus(200);
+        $cartResponse->assertSee('Margherita Pizza (Small)');
+        $cartResponse->assertSee('Margherita Pizza (Large)');
+
+        // Place order
+        $response = $this->post(route('public.order.place', [$org->id, $loc->id]), [
+            'customer_name' => 'Multi Variant Customer',
+            'customer_phone' => '9876543210',
+            'order_type' => 'Takeaway'
+        ]);
+        $response->assertRedirect();
+
+        // 2 * 150 + 1 * 350 = 300 + 350 = 650
+        $this->assertDatabaseHas('restaurant_orders', [
+            'organization_id' => $org->id,
+            'customer_name' => 'Multi Variant Customer',
+            'subtotal' => 650.00,
+            'total' => 650.00,
+        ]);
+    }
 }
